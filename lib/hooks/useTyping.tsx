@@ -1,43 +1,57 @@
 "use client";
 
-import { useRef, useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
 
-const TYPING_TIMEOUT = 2000; // 2 seconds
+const TYPING_TIMEOUT = 3000; // 3 seconds
 
 export function useTyping() {
   const setTyping = useMutation(api.typing.setTyping);
   const clearTyping = useMutation(api.typing.clearTyping);
-  const timeoutRef = useRef<number | null>(null);
+  const typingTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const startTyping = useCallback(
-    (conversationId: string, clerkId: string) => {
-      if (!conversationId || !clerkId) return;
-      const expiresAt = Date.now() + TYPING_TIMEOUT;
-      // send typing event
-      setTyping({ conversationId, clerkId, expiresAt }).catch(() => {});
-
-      // reset local timeout to clear typing after inactivity
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+    (conversationId: Id<"conversations">, userId: string) => {
+      // Clear existing timeout
+      if (typingTimeout.current) {
+        clearTimeout(typingTimeout.current);
       }
-      timeoutRef.current = window.setTimeout(() => {
-        clearTyping({ conversationId, clerkId }).catch(() => {});
-        timeoutRef.current = null;
-      }, TYPING_TIMEOUT + 200);
+
+      // Set typing status with expiration
+      setTyping({
+        conversationId,
+        clerkId: userId,
+        expiresAt: Date.now() + TYPING_TIMEOUT,
+      });
+
+      // Set timeout to clear typing status
+      typingTimeout.current = setTimeout(() => {
+        clearTyping({
+          conversationId,
+          clerkId: userId,
+        });
+      }, TYPING_TIMEOUT);
     },
     [setTyping, clearTyping]
   );
 
-  const stopTyping = useCallback((conversationId: string, clerkId: string) => {
-    if (!conversationId || !clerkId) return;
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    clearTyping({ conversationId, clerkId }).catch(() => {});
-  }, [clearTyping]);
+  const stopTyping = useCallback(
+    (conversationId: Id<"conversations">, userId: string) => {
+      // Clear timeout
+      if (typingTimeout.current) {
+        clearTimeout(typingTimeout.current);
+      }
+
+      // Immediately clear typing status
+      clearTyping({
+        conversationId,
+        clerkId: userId,
+      });
+    },
+    [clearTyping]
+  );
 
   return { startTyping, stopTyping };
 }

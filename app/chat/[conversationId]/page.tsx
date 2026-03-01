@@ -13,15 +13,17 @@ import type { Id } from "@/convex/_generated/dataModel";
 export default function ChatPage() {
   const params = useParams();
   const router = useRouter();
-  const rawId = params?.conversationId;
-  const conversationId = (Array.isArray(rawId) ? rawId[0] : rawId) ?? "";
+const rawId = params?.conversationId;
+const idString = Array.isArray(rawId) ? rawId[0] : rawId;
+if (!idString) return <div>Invalid conversation</div>;
+const conversationId = idString as Id<"conversations">;
   const resetUnread = useMutation(api.unreads.resetUnread);
   const { user } = useUser();
 
   useEffect(() => {
-    if (conversationId && user) {
-      resetUnread({
-        conversationId: conversationId as Id<"conversations">,
+if (user) {
+  resetUnread({
+    conversationId,
         clerkId: user.id,
       }).catch(() => {});
     }
